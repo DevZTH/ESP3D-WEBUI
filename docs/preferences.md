@@ -115,7 +115,7 @@ It is a json file but with specific format.
   "tftmskusbplaycmd": "M998 0;M23 0:#;M24",
   "sort_tftusb_files": true,
   "sd": false,
-  "sdlistcmd": "M21;M20",
+  "sdlistcmd": "M21;M20 L",
   "sdplaycmd": "M21;M23 #;M24",
   "sddeletecmd": "M21;M30 #",
   "sort_sd_files": true,
@@ -795,5 +795,3 @@ If you need to combine 2 or more conditions it is also possible
     }
 ],
 ```
-
-

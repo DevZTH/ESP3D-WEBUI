@@ -81,7 +81,7 @@
     "dependencies": {
         "preact": "^10.10.1",
         "preact-feather": "^4.2.1",
-        "spectre.css": "luc-github/spectre"
+        "spectre.css": "https://codeload.github.com/luc-github/spectre/tar.gz/7c537fafa1e209d7054725110b1c00dda2faa187"
     },
     "browserslist": {
         "production": [
