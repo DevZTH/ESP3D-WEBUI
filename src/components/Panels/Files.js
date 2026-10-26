@@ -208,7 +208,7 @@ const FilesPanel = () => {
             })
             //prepare POST data
             const formData = new FormData()
-            formData.append("path", currentPath[currentFS])
+            if (!cmd.fileField) formData.append("path", currentPath[currentFS])
             for (let i = 0; i < list.length; i++) {
                 const file = list[i]
 
@@ -226,6 +226,19 @@ const FilesPanel = () => {
                     fileName = needFormatFileName.name
                 } else {
                     fileName = file.name
+                }
+                if (cmd.fileField) {
+                    //the target expects a single named file field
+                    formData.append(
+                        cmd.fileField,
+                        file,
+                        cmd.plainFileName
+                            ? fileName
+                            : cmd.args.path +
+                                  (cmd.args.path.endsWith("/") ? "" : "/") +
+                                  fileName
+                    )
+                    continue
                 }
                 const arg =
                     cmd.args.path +
@@ -297,6 +310,7 @@ const FilesPanel = () => {
 
     const filesSelected = (e) => {
         const content = []
+        let rejected = false
         const length = fileref.current.files.length
         for (let index = 0; index < length; index++) {
             content.push(<li>{fileref.current.files[index].name}</li>)
@@ -315,8 +329,13 @@ const FilesPanel = () => {
                     fileref.current.files[index].name,
                     true
                 )
-                toasts.add({ content: T(eMsg), type: "error" })
+                toasts.addToast({ content: T(eMsg), type: "error" })
+                rejected = true
             }
+        }
+        if (rejected) {
+            fileref.current.value = ""
+            return
         }
 
         showConfirmationModal({
