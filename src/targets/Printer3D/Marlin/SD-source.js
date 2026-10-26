@@ -27,6 +27,13 @@ import {
 } from "../../../components/Helpers"
 import { useUiContextFn, useSettingsContextFn } from "../../../contexts"
 
+// Same rules as validFilename() in ESP3D's octoprint-upload.cpp.
+const isOctoPrintFileName = (filename) => {
+    if (!filename || filename.length > 120 || filename.includes(".."))
+        return false
+    return !/[\x00-\x1f\x7f/\\:*?"<>|]/.test(filename)
+}
+
 //Extract information from string - specific to FW / source
 const formatFileSerialLine = (lines) => {
     const filesFilter = useUiContextFn.getValue("filesfilter") //get extension list
@@ -71,10 +78,16 @@ const capabilities = {
     UseFilters: () => true,
     IsFlatFS: () => true,
     Upload: (path, filename, eMsg = false) => {
-        if (eMsg) return "E1"
-        //TODO
-        //check 8.1 if become true
-        return useSettingsContextFn.getValue("SerialProtocol") == "MKS"
+        if (useSettingsContextFn.getValue("SerialProtocol") == "MKS") {
+            if (eMsg) return "E1"
+            return true
+        }
+        // Other boards upload through the ESP3D OctoPrint API, which writes
+        // the file with Marlin binary file transfer into the SD root.
+        if (eMsg) return "E2"
+        const inRoot = path === undefined || path == "/" || path == ""
+        if (filename === undefined) return inRoot
+        return inRoot && isOctoPrintFileName(filename)
     },
     UploadMultiple: () => {
         return false
@@ -113,21 +126,23 @@ const commands = {
                 url: "upload",
                 args: { path },
             }
-        //other is not supported so return list command for safety
         return {
-            type: "cmd",
-            cmd: useUiContextFn.getValue("sdlistcmd"),
+            type: "url",
+            url: "api/files/local",
+            fileField: "file",
+            plainFileName: true,
+            args: { path },
         }
     },
     postUpload: (path, filename) => {
-        if (useSettingsContextFn.getValue("SerialProtocol") == "MKS") {
-            return {
-                type: "refresh",
-                arg: false,
-                timeOut: 3000,
-            }
+        return {
+            type: "refresh",
+            arg: false,
+            timeOut:
+                useSettingsContextFn.getValue("SerialProtocol") == "MKS"
+                    ? 3000
+                    : 1000,
         }
-        return { type: "none" }
     },
     formatResult: (result) => {
         const files = formatFileSerialLine(result.content)
@@ -186,9 +201,17 @@ const responseSteps = {
     },
     delete: {
         start: (data) => data.startsWith("File deleted"),
-        end: (data) => data.startsWith("ok") && !data.startsWith("ok T:"),
+        // An "ok" from M21 or from polling can come before "File deleted"
+        // and would end the query as an error, so end on the message itself
+        end: (data) => data.startsWith("File deleted"),
         error: (data) => {
-            return data.startsWith("Deletion failed")
+            return (
+                data.startsWith("Deletion failed") ||
+                data.indexOf("echo:No SD card") != -1 ||
+                data.indexOf("echo:No media") != -1 ||
+                data.indexOf('echo:Unknown command: "M21"') != -1 ||
+                data.indexOf('echo:Unknown command: "M30"') != -1
+            )
         },
     },
 }
